@@ -1,94 +1,48 @@
 # igScripts
+
 Instagram Clean: a lightweight, privacy-first userscript that makes Instagram Web distraction-free on iPhone Safari (iOS 26), using the [Userscripts](https://github.com/quoid/userscripts) extension by quoid.
 
-It keeps Instagram's useful social features while removing addictive content and unnecessary recommendations.
+## Repository
 
-## Repository structure
+- `instagram-clean.user.js`: the single script containing everything (version 2.1).
+- The third-party *Instagram Distraction Free* (Lukas Westholt) reference script was reviewed and then removed from the repo; its findings are summarized below.
 
-- `instagram-clean.user.js`: our custom script (the primary file to develop).
-- `reference-instagram-distraction-free.js`: *Instagram Distraction Free* by Lukas Westholt, downloaded from Greasy Fork. **Reference material only** for studying detection and filtering techniques. Do not modify it, do not blindly copy it, and treat it as untrusted until reviewed.
+## What it does
 
-## Features
+- **Reels:** hides Reels links, removes Reels posts from Home, blocks clicks to and redirects `/reels/...` to `/`. Single `/reel/<id>/` links still work.
+- **Suggested content:** hides suggested posts and recommended-account modules (English and Spanish labels).
+- **Ads:** hides sponsored posts using label matching (EN/ES/FR/DE/IT/PT), tolerant of zero-width characters and split-letter labels; also checks `aria-label`. Profile links are ignored so usernames like "ad" aren't hidden. Paid partnerships are kept unless `CONFIG.paidPartnerships` is `true`.
+- **Loader:** a full-screen spinner covers the page until the first filtering pass finishes (feed posts found + 250 ms), with a 5 s fail-safe. Light/dark and reduced-motion aware.
+- **Preserved:** DMs, Stories, profiles, search, posting, notifications are untouched.
 
-1. **Remove Reels**
-   - Hide the Reels navigation tab.
-   - Remove Reels from the Home feed.
-   - Block navigation to the infinite Reels feed.
-   - Preserve regular photo and carousel posts.
-   - Ideally allow individual Reels shared through DMs without enabling infinite scrolling.
-2. **Remove suggested content**
-   - Hide suggested posts and recommended accounts.
-   - Preserve content from followed accounts.
-   - Support Instagram in English and Spanish.
-3. **Remove advertisements**
-   - Hide sponsored posts and ads in the Home feed.
-   - Avoid hiding legitimate content.
-4. **Preserve Instagram functionality**
-   - DMs, Stories, profiles, search, posting, and notifications keep working.
-   - The interface stays responsive and visually clean.
+## Install
 
-## Technical constraints
+1. Install Userscripts (quoid) on iOS and enable it for Safari.
+2. Copy `instagram-clean.user.js` into your Userscripts folder (no auto-update URL is set, by design).
+3. Open instagram.com in Safari.
 
-- Target: iPhone Safari, iOS 26, with the Userscripts extension by quoid.
-- Vanilla JavaScript only: no React, TypeScript build pipeline, backend, or external dependencies.
-- Compact, clearly auditable functions.
-- Use `MutationObserver` for the dynamically rendered feed; avoid unnecessary DOM scanning and heavy observers.
-- Handle Instagram's single-page navigation and lazily loaded posts.
-- Valid userscript metadata header with `@match` entries for Instagram only.
-- Prefer DOM-based filtering. API-level filtering requires an explained tradeoff and explicit approval first.
+## Security design
 
-## Security requirements (highest priority)
+- `@grant none`; `@match` limited to `www.instagram.com` and `m.instagram.com`; `@noframes`.
+- No network calls, storage, cookies, telemetry, `eval`, remote loading, or `innerHTML`.
+- No overrides of `fetch`, XHR, `JSON.parse` or `history`. DOM-only filtering via `MutationObserver` throttled with `requestAnimationFrame`.
+- No update URLs: updates are manual and reviewed.
 
-The script runs inside an authenticated Instagram session, so:
+### Reference script review (Instagram Distraction Free)
 
-- Never collect, log, store, or transmit passwords, cookies, session tokens, or authentication headers.
-- Never send Instagram data to external servers. No analytics, telemetry, tracking, or remote dependencies.
-- No `eval`, remote script loading, or obfuscated code.
-- Do not override `fetch`, `XMLHttpRequest`, `JSON.parse`, or other global APIs unless absolutely necessary and explicitly justified.
-- Do not disable Instagram's security warnings or diagnostics.
-- Keep permissions limited to Instagram domains.
-- No automatic updates from unreviewed sources.
-- Treat third-party userscript code as untrusted until reviewed.
+No exploitable vulnerabilities, but: it auto-updates from Greasy Fork (a later release would run in your logged-in session); it overrides `JSON.parse`, `Response.prototype.json`, `fetch` and XHR so it can see all API traffic; it filters Instagram's self-XSS console warning and blocks some telemetry/read-receipt calls. We deliberately avoid all of these.
 
-## Reference script security review
+## Limitations
 
-Review of `reference-instagram-distraction-free.js` found no exploitable vulnerabilities, but note:
+- Tested only with `node --check` and a synthetic jsdom page. **Not yet verified on live Instagram or iOS Safari.**
+- Label/selector matching depends on Instagram's current DOM and may break when it changes.
+- DM-shared reels may open under `/reels/<id>/`, which would be redirected to `/` (unverified).
+- Ads/suggestions are only filtered on the Home route; ads outside `article`/`role="article"` are missed.
 
-- `@grant none`, no `@require`/`@resource`, `@match` limited to `*.instagram.com`; no `eval`, `innerHTML`, cookie access, or outbound network calls of its own.
-- `@updateURL`/`@downloadURL` point to Greasy Fork: a later upstream release would run in your logged-in session. Do not enable auto-update for it.
-- It overrides `JSON.parse`, `Response.prototype.json`, `fetch` and XHR, so it can see all Instagram API traffic. We avoid this approach (DOM-based filtering only).
-- It filters the console self-XSS warning and blocks some Instagram telemetry/read-receipt calls, which conflicts with our rules.
+## Next steps
 
-## Development guidelines
-
-1. Explain the issue being addressed.
-2. Make small, focused changes.
-3. Preserve existing functionality.
-4. Avoid unnecessary complexity.
-5. Check for security and performance regressions.
-6. Document limitations and assumptions.
-7. Do not claim a selector or feature works on iOS unless it has been tested or verified.
-
-## Success criteria
-
-With the userscript enabled in Safari:
-
-- The Home feed shows ordinary posts from followed accounts.
-- Sponsored posts and recommendations are hidden.
-- Reels and infinite Reels navigation are blocked.
-- Stories and DMs remain functional.
-- No account data leaves the device because of our code.
-- Works without subscriptions, a backend, or periodic reinstallation.
-
-## Notes and limitations
-
-- A full-screen loader covers the page until the first filtering pass completes (feed posts found plus a 250 ms settle), with a 5 s fail-safe so the page is never blocked.
-- Runs at `document-start`; no `history`/`fetch`/XHR overrides. Reels routes are caught via click interception, `popstate` and the DOM observer.
-- `/reels/...` is redirected to `/`; single `/reel/<id>/` links are allowed. Unverified: Instagram may open DM-shared reels under `/reels/<id>/`, which would then be redirected.
-- Label/selector matching (English/Spanish) depends on Instagram's current DOM and may break when it changes. Not yet tested on iOS Safari.
-
-- Ad detection is label-based: normalized text (zero-width chars stripped), split-letter labels, `aria-label`, and EN/ES/FR/DE/IT/PT words (`Sponsored`, `Ad`, `Anuncio`, ...). Profile links are ignored so usernames like "ad" aren't hidden. "Paid partnership" posts are kept unless `CONFIG.paidPartnerships` is `true`. Tested only against a synthetic DOM (jsdom), not live Instagram.
-
-## Status
-
-Next step: audit both scripts (architecture and security implications), then implement the first set of safe DOM-based filters in the custom script.
+1. Test on a real iPhone (Web Inspector from a Mac): confirm hidden elements are ads/suggestions and nothing legitimate disappears.
+2. Verify DM-shared reels, Stories, search, posting and notifications still work; adjust the Reels redirect if needed.
+3. Check the Reels tab hiding on the mobile bottom nav.
+4. Add Spanish/English suggested-module checks against real markup; add a CONFIG toggle for the loader.
+5. Re-check selectors periodically as Instagram changes its DOM.
