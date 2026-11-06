@@ -1,14 +1,13 @@
-
- // ==UserScript==
- // @name         Instagram Clean
- // @version      2.1
- // @description  Hides Reels, suggested posts and ads on Instagram Web. DOM-only, no network access.
- // @match        https://www.instagram.com/*
- // @match        https://m.instagram.com/*
- // @run-at       document-start
- // @grant        none
- // @noframes
- // ==/UserScript==
+// ==UserScript==
+// @name         Instagram Clean
+// @version      2.1
+// @description  Hides Reels, suggested posts and ads on Instagram Web. DOM-only, no network access.
+// @match        https://www.instagram.com/*
+// @match        https://m.instagram.com/*
+// @run-at       document-start
+// @grant        none
+// @noframes
+// ==/UserScript==
 
  (() => {
    'use strict';
