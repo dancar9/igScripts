@@ -87,6 +87,8 @@ With the userscript enabled in Safari:
 - `/reels/...` is redirected to `/`; single `/reel/<id>/` links are allowed. Unverified: Instagram may open DM-shared reels under `/reels/<id>/`, which would then be redirected.
 - Label/selector matching (English/Spanish) depends on Instagram's current DOM and may break when it changes. Not yet tested on iOS Safari.
 
+- Ad detection is label-based: normalized text (zero-width chars stripped), split-letter labels, `aria-label`, and EN/ES/FR/DE/IT/PT words (`Sponsored`, `Ad`, `Anuncio`, ...). Profile links are ignored so usernames like "ad" aren't hidden. "Paid partnership" posts are kept unless `CONFIG.paidPartnerships` is `true`. Tested only against a synthetic DOM (jsdom), not live Instagram.
+
 ## Status
 
 Next step: audit both scripts (architecture and security implications), then implement the first set of safe DOM-based filters in the custom script.

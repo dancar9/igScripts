@@ -16,11 +16,13 @@
    const CONFIG = {
      reels: true,
      suggested: true,
-     ads: true
+     ads: true,
+     paidPartnerships: false // posts from followed creators; hidden only if true
    };
 
    const LABELS = {
-     ads: /^(sponsored|patrocinado|patrocinada|publicidad|advertisement|paid partnership|colaboración pagada)$/i,
+     ads: /^(sponsored|ad|ads|advertisement|patrocinado|patrocinada|publicidad|anuncio|anuncios|sponsorisé|sponsorisée|publicité|gesponsert|anzeige|sponsorizzato|pubblicità)$/i,
+     paid: /^(paid partnership|colaboración pagada|colaboración pagado|parceria paga)$/i,
      suggested: /^(suggested for you|suggested posts?|recommended for you|because you follow .+|sugerencias para ti|sugerido para ti|sugerida para ti|publicaciones sugeridas|recomendado para ti|porque sigues a .+)$/i
    };
 
@@ -91,29 +93,57 @@
      if (element) element.setAttribute(HIDDEN, '');
    }
 
+   // Strip zero-width characters and collapse whitespace so obfuscated
+   // labels (e.g. "Spon\u200bsored") still match.
+   function normalize(text) {
+     return (text || '')
+       .normalize('NFKC')
+       .replace(/[\u200b-\u200f\u2060\ufeff]/g, '')
+       .replace(/\s+/g, ' ')
+       .trim();
+   }
+
    function isLabel(element, pattern) {
-     const text = element.textContent?.trim() || '';
-     return text.length < 100 && pattern.test(text);
+     const text = normalize(element.textContent);
+     if (text.length >= 100) return false;
+     if (pattern.test(text)) return true;
+     // Labels split across per-letter spans may include hidden decoy text;
+     // innerText only contains what is actually rendered.
+     return text.length <= 40 && pattern.test(normalize(element.innerText));
+   }
+
+   // Usernames (e.g. an account called "ad") must never count as labels.
+   function isProfileLink(el) {
+     const link = el.closest('a[href]');
+     return !!link && /^\/[^/]+\/?$/.test(link.getAttribute('href'));
    }
 
    function hasLabel(root, pattern) {
-     return [...root.querySelectorAll('span, a, div')]
-       .some(el =>
-         el.children.length === 0 &&
-         isLabel(el, pattern)
-       );
+     // Elements are not required to be leaves: a wrapper whose whole text is
+     // the label (split into child spans) matches, but a header containing
+     // a username plus the label does not.
+     return [...root.querySelectorAll('span, a, div, time')]
+       .some(el => !isProfileLink(el) && isLabel(el, pattern)) ||
+       [...root.querySelectorAll('[aria-label]')]
+         .some(el => pattern.test(normalize(el.getAttribute('aria-label'))));
    }
 
    function cleanPosts() {
      if (location.pathname !== '/') return;
 
-     document.querySelectorAll(`article:not([${HIDDEN}])`).forEach(post => {
+     document.querySelectorAll(`article:not([${HIDDEN}]), [role="article"]:not([${HIDDEN}])`).forEach(post => {
        const header = post.querySelector('header');
        const top = header || post;
 
        // Anuncios
        if (CONFIG.ads &&
            hasLabel(top, LABELS.ads)) {
+         hide(post);
+         return;
+       }
+
+       if (CONFIG.paidPartnerships &&
+           hasLabel(top, LABELS.paid)) {
          hide(post);
          return;
        }
