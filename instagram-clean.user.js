@@ -1,10 +1,13 @@
 
  // ==UserScript==
  // @name         Instagram Clean
- // @version      2.0
+ // @version      2.1
+ // @description  Hides Reels, suggested posts and ads on Instagram Web. DOM-only, no network access.
  // @match        https://www.instagram.com/*
  // @match        https://m.instagram.com/*
- // @run-at       document-idle
+ // @run-at       document-start
+ // @grant        none
+ // @noframes
  // ==/UserScript==
 
  (() => {
@@ -23,14 +26,66 @@
 
    const HIDDEN = 'data-ig-clean-hidden';
 
+   const LOADER_ID = 'ig-clean-loader';
+   const LOADER_MAX_MS = 5000; // fail-safe: never block the page longer
+   const LOADER_SETTLE_MS = 250;
+
    const css = document.createElement('style');
    css.textContent = `
      [${HIDDEN}] { display: none !important; }
      a[href="/reels/"], a[href^="/reels/?"] {
        display: none !important;
      }
+     #${LOADER_ID} {
+       position: fixed; inset: 0; z-index: 2147483647;
+       display: flex; align-items: center; justify-content: center;
+       background: #fff; transition: opacity .2s;
+     }
+     #${LOADER_ID}.done { opacity: 0; pointer-events: none; }
+     #${LOADER_ID} i {
+       width: 32px; height: 32px; border-radius: 50%;
+       border: 3px solid #ccc; border-top-color: #555;
+       animation: ig-clean-spin .8s linear infinite;
+     }
+     @keyframes ig-clean-spin { to { transform: rotate(360deg); } }
+     @media (prefers-color-scheme: dark) {
+       #${LOADER_ID} { background: #000; }
+       #${LOADER_ID} i { border-color: #444; border-top-color: #ddd; }
+     }
+     @media (prefers-reduced-motion: reduce) {
+       #${LOADER_ID} i { animation-duration: 3s; }
+     }
    `;
    document.documentElement.appendChild(css);
+
+   // Cover the page until the first filtering pass is done, so
+   // Reels/ads/suggestions never flash on screen.
+   const loader = document.createElement('div');
+   loader.id = LOADER_ID;
+   loader.setAttribute('role', 'status');
+   loader.setAttribute('aria-label', 'Loading');
+   loader.appendChild(document.createElement('i'));
+   document.documentElement.appendChild(loader);
+
+   let loaderDone = false;
+   function finishLoader() {
+     if (loaderDone) return;
+     loaderDone = true;
+     loader.classList.add('done');
+     setTimeout(() => loader.remove(), 300);
+   }
+
+   // Ready once the feed has posts (home) or the page has content (other
+   // routes), then wait a short settle period for late-rendered labels.
+   let settleTimer = 0;
+   function checkLoaderReady() {
+     if (loaderDone || settleTimer) return;
+     const ready = location.pathname === '/'
+       ? document.querySelector('article')
+       : document.querySelector('main, [role="main"]');
+     if (ready) settleTimer = setTimeout(() => { clean(); finishLoader(); }, LOADER_SETTLE_MS);
+   }
+   setTimeout(finishLoader, LOADER_MAX_MS);
 
    function hide(element) {
      if (element) element.setAttribute(HIDDEN, '');
@@ -52,7 +107,7 @@
    function cleanPosts() {
      if (location.pathname !== '/') return;
 
-     document.querySelectorAll('article').forEach(post => {
+     document.querySelectorAll(`article:not([${HIDDEN}])`).forEach(post => {
        const header = post.querySelector('header');
        const top = header || post;
 
@@ -108,6 +163,7 @@
    }
 
    function clean() {
+     guardRoute();
      cleanNavigation();
      cleanPosts();
      cleanSuggestions();
@@ -117,13 +173,28 @@
    document.addEventListener('click', event => {
      if (!CONFIG.reels) return;
 
-     const link = event.target.closest?.('a[href]');
-     if (link &&
-         /^\/reels(?:\/|$)/.test(new URL(link.href).pathname)) {
+     const target = event.target;
+     const link = target instanceof Element ? target.closest('a[href]') : null;
+     if (link && link.origin === location.origin && isReelsFeed(link.pathname)) {
        event.preventDefault();
        event.stopImmediatePropagation();
      }
    }, true);
+
+   // Block the infinite feed (/reels/ and /reels/<id>/), allow single /reel/<id>/.
+   function isReelsFeed(path) {
+     return /^\/reels(?:\/|$)/.test(path);
+   }
+
+   // Single-page app: no history API overrides; guard runs on popstate and on
+   // every DOM mutation batch (route changes re-render the page).
+   function guardRoute() {
+     if (CONFIG.reels && isReelsFeed(location.pathname)) {
+       location.replace('/');
+     }
+   }
+
+   addEventListener('popstate', guardRoute);
 
    let pending = false;
 
@@ -134,6 +205,7 @@
      requestAnimationFrame(() => {
        pending = false;
        clean();
+       checkLoaderReady();
      });
    }).observe(document.documentElement, {
      childList: true,
@@ -141,4 +213,5 @@
    });
 
    clean();
+   checkLoaderReady();
  })();

@@ -80,6 +80,13 @@ With the userscript enabled in Safari:
 - No account data leaves the device because of our code.
 - Works without subscriptions, a backend, or periodic reinstallation.
 
+## Notes and limitations
+
+- A full-screen loader covers the page until the first filtering pass completes (feed posts found plus a 250 ms settle), with a 5 s fail-safe so the page is never blocked.
+- Runs at `document-start`; no `history`/`fetch`/XHR overrides. Reels routes are caught via click interception, `popstate` and the DOM observer.
+- `/reels/...` is redirected to `/`; single `/reel/<id>/` links are allowed. Unverified: Instagram may open DM-shared reels under `/reels/<id>/`, which would then be redirected.
+- Label/selector matching (English/Spanish) depends on Instagram's current DOM and may break when it changes. Not yet tested on iOS Safari.
+
 ## Status
 
 Next step: audit both scripts (architecture and security implications), then implement the first set of safe DOM-based filters in the custom script.
