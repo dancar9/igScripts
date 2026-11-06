@@ -5,8 +5,8 @@ It keeps Instagram's useful social features while removing addictive content and
 
 ## Repository structure
 
-- `Createdfile`: placeholder for our custom script, intended to become `instagram-clean.user.js` (the primary file to develop).
-- `Greasy fork script`: *Instagram Distraction Free* by Lukas Westholt, downloaded from Greasy Fork. **Reference material only** for studying detection and filtering techniques. Do not modify it, do not blindly copy it, and treat it as untrusted until reviewed.
+- `instagram-clean.user.js`: our custom script (the primary file to develop).
+- `reference-instagram-distraction-free.js`: *Instagram Distraction Free* by Lukas Westholt, downloaded from Greasy Fork. **Reference material only** for studying detection and filtering techniques. Do not modify it, do not blindly copy it, and treat it as untrusted until reviewed.
 
 ## Features
 
@@ -49,6 +49,15 @@ The script runs inside an authenticated Instagram session, so:
 - Keep permissions limited to Instagram domains.
 - No automatic updates from unreviewed sources.
 - Treat third-party userscript code as untrusted until reviewed.
+
+## Reference script security review
+
+Review of `reference-instagram-distraction-free.js` found no exploitable vulnerabilities, but note:
+
+- `@grant none`, no `@require`/`@resource`, `@match` limited to `*.instagram.com`; no `eval`, `innerHTML`, cookie access, or outbound network calls of its own.
+- `@updateURL`/`@downloadURL` point to Greasy Fork: a later upstream release would run in your logged-in session. Do not enable auto-update for it.
+- It overrides `JSON.parse`, `Response.prototype.json`, `fetch` and XHR, so it can see all Instagram API traffic. We avoid this approach (DOM-based filtering only).
+- It filters the console self-XSS warning and blocks some Instagram telemetry/read-receipt calls, which conflicts with our rules.
 
 ## Development guidelines
 
